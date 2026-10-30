@@ -1,0 +1,45 @@
+spring:
+  application:
+    name: relay
+  datasource:
+    url: jdbc:h2:mem:relay;DB_CLOSE_DELAY=-1
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+  task:
+    execution:
+      pool:
+        core-size: 4
+
+relay:
+  agent:
+    # auto: Claude when ANTHROPIC_API_KEY is set, the scripted agent otherwise
+    mode: ${RELAY_AGENT_MODE:auto}
+    model: ${RELAY_MODEL:claude-opus-5-5}
+    effort: ${RELAY_EFFORT:medium}
+    max-turns: 12
+    fallbacks: true
+    auto-send-read-only: true
+  seed:
+    enabled: ${RELAY_SEED:true}
+  operator:
+    username: ${RELAY_OPERATOR_USER:operator}
+    # Unset: a random password is generated and logged at startup
+    password: ${RELAY_OPERATOR_PASSWORD:}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+---
+spring:
+  config:
+    activate:
+      on-profile: postgres
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/relay}
+    username: ${DB_USER:relay}
+    password: ${DB_PASSWORD}

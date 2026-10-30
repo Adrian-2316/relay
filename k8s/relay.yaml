@@ -1,0 +1,51 @@
+# kubectl create secret generic relay-secrets --from-literal=ANTHROPIC_API_KEY=... --from-literal=DB_PASSWORD=... --from-literal=RELAY_OPERATOR_PASSWORD=...
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: relay
+  labels: { app: relay }
+spec:
+  replicas: 1   # the live event stream is in-memory; scale out behind a broker (Redis, NATS) first
+  selector:
+    matchLabels: { app: relay }
+  template:
+    metadata:
+      labels: { app: relay }
+    spec:
+      securityContext:
+        runAsNonRoot: true
+      containers:
+        - name: relay
+          image: ghcr.io/adrian-2316/relay:0.1.0
+          ports:
+            - containerPort: 8080
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: postgres
+            - name: DB_URL
+              value: jdbc:postgresql://relay-db:5432/relay
+            - name: ANTHROPIC_API_KEY
+              valueFrom: { secretKeyRef: { name: relay-secrets, key: ANTHROPIC_API_KEY } }
+            - name: DB_PASSWORD
+              valueFrom: { secretKeyRef: { name: relay-secrets, key: DB_PASSWORD } }
+            - name: RELAY_OPERATOR_PASSWORD
+              valueFrom: { secretKeyRef: { name: relay-secrets, key: RELAY_OPERATOR_PASSWORD } }
+          readinessProbe:
+            httpGet: { path: /actuator/health, port: 8080 }
+            initialDelaySeconds: 10
+          livenessProbe:
+            httpGet: { path: /actuator/health, port: 8080 }
+            initialDelaySeconds: 30
+          resources:
+            requests: { cpu: 250m, memory: 384Mi }
+            limits: { memory: 768Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: relay
+spec:
+  selector: { app: relay }
+  ports:
+    - port: 80
+      targetPort: 8080

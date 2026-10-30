@@ -1,0 +1,8 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:test-${random.uuid};DB_CLOSE_DELAY=-1
+relay:
+  agent:
+    mode: scripted
+  seed:
+    enabled: false
