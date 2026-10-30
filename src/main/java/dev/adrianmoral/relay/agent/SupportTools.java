@@ -177,7 +177,10 @@ public class SupportTools {
     public String perform(PendingAction action) {
         JsonNode in = read(action.getPayload());
         return switch (action.getType()) {
-            case REFUND -> "Refund " + store.refund(text(in, "charge_id"), cents(in.path("amount_eur").asDouble()));
+            case REFUND -> {
+                long amount = cents(in.path("amount_eur").asDouble());
+                yield "Refunded " + eur(amount) + " to the card (" + store.refund(text(in, "charge_id"), amount) + ")";
+            }
             case ADDRESS_CHANGE -> "Rerouted to " + store.updateAddress(text(in, "order_id"), text(in, "new_address")).address();
             case SEND_INVOICE -> "Sent " + store.sendInvoice(text(in, "order_id"), text(in, "company_name"), text(in, "vat_number"));
         };

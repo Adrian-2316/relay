@@ -4,229 +4,198 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Relay Agent Inbox</title>
-<meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@400&family=Young+Serif&display=swap">
 <style>
-/* Layout: three-pane support console. Queues | tickets sorted by the agent | the agent's run, its proposed action and the human approval step */
+/* Layout: two panes. Inbox list on the left, one conversation on the right that reads top to bottom:
+   the customer's words, what the agent did, then the one decision it needs from you. */
 :root {
-  --bg: #f3f4f7;
+  --bg: #f8f7f4;
   --panel: #ffffff;
-  --sunk: #eceef3;
-  --line: #dfe2ea;
-  --fg: #151824;
-  --muted: #646b7f;
-  --accent: #2c4ee6;
-  --accent-soft: #e6ebff;
-  --agent: #b45f12;
-  --agent-soft: #fbefe2;
-  --ok: #18794e;
-  --ok-soft: #e1f3e9;
-  --bad: #c22f3b;
-  --bad-soft: #fbe5e7;
-  --shadow: 0 1px 2px rgba(20, 24, 40, .06), 0 8px 24px rgba(20, 24, 40, .06);
-  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
-  --body: "Geist", "Segoe UI", system-ui, sans-serif;
-  --mono: "Geist Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --sunk: #f0eee9;
+  --line: #e6e2db;
+  --ink: #221c18;
+  --muted: #706a63;
+  --leaf: #2d6a52;
+  --leaf-ink: #ffffff;
+  --leaf-soft: #e3efe8;
+  --honey: #9a6210;
+  --honey-soft: #fbf0db;
+  --cherry: #b23c35;
+  --cherry-soft: #f9e6e3;
+  --display: "Young Serif", Georgia, "Times New Roman", serif;
+  --body: "Figtree", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0f1117; --panel: #161922; --sunk: #1d2130; --line: #2a2f40; --fg: #e8eaf2; --muted: #9097ab;
-    --accent: #7d93ff; --accent-soft: #232b52; --agent: #f0a35a; --agent-soft: #3a2a18;
-    --ok: #4cc38a; --ok-soft: #173326; --bad: #ff7a85; --bad-soft: #3d1b20;
-    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.25); color-scheme: dark;
+    --bg: #151412; --panel: #1d1b19; --sunk: #252320; --line: #2f2c28; --ink: #eeeae4; --muted: #a39d95;
+    --leaf: #7cc4a3; --leaf-ink: #10241b; --leaf-soft: #1d3129; --honey: #e8b462; --honey-soft: #362b18;
+    --cherry: #f08b80; --cherry-soft: #3a2220; color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #0f1117; --panel: #161922; --sunk: #1d2130; --line: #2a2f40; --fg: #e8eaf2; --muted: #9097ab;
-  --accent: #7d93ff; --accent-soft: #232b52; --agent: #f0a35a; --agent-soft: #3a2a18;
-  --ok: #4cc38a; --ok-soft: #173326; --bad: #ff7a85; --bad-soft: #3d1b20;
-  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.25); color-scheme: dark;
+  --bg: #151412; --panel: #1d1b19; --sunk: #252320; --line: #2f2c28; --ink: #eeeae4; --muted: #a39d95;
+  --leaf: #7cc4a3; --leaf-ink: #10241b; --leaf-soft: #1d3129; --honey: #e8b462; --honey-soft: #362b18;
+  --cherry: #f08b80; --cherry-soft: #3a2220; color-scheme: dark;
 }
-html, body { height: 100%; }
-body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 14px; line-height: 1.45; }
 * { box-sizing: border-box; }
-button, textarea { font: inherit; color: inherit; }
-button { cursor: pointer; }
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-
-.app { height: 100%; display: grid; grid-template-rows: auto 1fr; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 14px; gap: 14px; }
-
-/* top bar */
-.top { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
-.brand { display: flex; align-items: center; gap: 10px; font-family: var(--display); font-weight: 700; font-size: 20px; letter-spacing: -.01em; }
-.mark { width: 28px; height: 28px; border-radius: 8px; background: var(--fg); color: var(--bg); display: grid; place-items: center; }
-.mark svg { width: 16px; height: 16px; }
-.ws { color: var(--muted); font-size: 13px; padding-left: 14px; border-left: 1px solid var(--line); }
-.stats { display: flex; gap: 22px; margin-left: auto; flex-wrap: wrap; }
-.stat { display: flex; flex-direction: column; }
-.stat b { font-family: var(--mono); font-weight: 500; font-size: 15px; font-variant-numeric: tabular-nums; }
-.stat span { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
-.guard { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 6px 10px; border-radius: 999px; background: var(--agent-soft); color: var(--agent); font-weight: 500; }
-
-/* panes */
-.panes { display: grid; grid-template-columns: 200px 370px minmax(0, 1fr); gap: 14px; min-height: 0; }
-.pane { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; min-height: 0; overflow: auto; }
-.queues { background: transparent; border: 0; padding: 4px 0; display: flex; flex-direction: column; gap: 2px; }
-.qlabel { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); padding: 8px 10px; }
-.q { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 9px; border: 0; background: transparent; text-align: left; width: 100%; }
-.q:hover { background: var(--sunk); }
-.q[aria-pressed="true"] { background: var(--panel); box-shadow: var(--shadow); font-weight: 600; }
-.q .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
-.q .n { margin-left: auto; font-family: var(--mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.tools { margin-top: 16px; padding: 12px 10px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: var(--muted); }
-.tools code { font-family: var(--mono); font-size: 11.5px; color: var(--fg); }
-.tool-row { display: flex; align-items: center; gap: 8px; }
-.tool-row i { width: 6px; height: 6px; border-radius: 50%; background: var(--ok); }
-
-/* ticket list */
-.list-head { position: sticky; top: 0; background: var(--panel); padding: 14px 16px 10px; border-bottom: 1px solid var(--line); display: flex; align-items: baseline; justify-content: space-between; z-index: 1; }
-.list-head h2 { font-family: var(--display); font-size: 17px; margin: 0; }
-.list-head small { color: var(--muted); font-size: 12px; }
-.tk { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 4px 12px; padding: 14px 16px; border: 0; border-bottom: 1px solid var(--line); background: transparent; text-align: left; width: 100%; }
-.tk:hover { background: var(--sunk); }
-.tk[aria-current="true"] { background: var(--accent-soft); }
-.av { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-weight: 600; font-size: 12px; grid-row: span 3; color: #fff; }
-.tk .who { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tk .when { font-size: 12px; color: var(--muted); font-family: var(--mono); }
-.tk .subj { grid-column: 2 / 4; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tk .tags { grid-column: 2 / 4; display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
-.chip { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: var(--sunk); color: var(--muted); font-weight: 500; white-space: nowrap; }
-.chip.hi { background: var(--bad-soft); color: var(--bad); }
-.chip.wait { background: var(--agent-soft); color: var(--agent); }
-.chip.ok { background: var(--ok-soft); color: var(--ok); }
-.chip.esc { background: var(--bad-soft); color: var(--bad); }
-
-/* detail */
-.detail { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-.col { padding: 20px 22px; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
-.col + .col { border-left: 1px solid var(--line); background: color-mix(in srgb, var(--sunk) 45%, var(--panel)); }
-.d-head h1 { font-family: var(--display); font-size: 22px; line-height: 1.2; margin: 0 0 6px; text-wrap: balance; letter-spacing: -.01em; }
-.d-meta { color: var(--muted); font-size: 12.5px; display: flex; gap: 10px; flex-wrap: wrap; }
-.msg { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
-.msg p { margin: 0 0 8px; max-width: 62ch; }
-.msg p:last-child { margin: 0; }
-.sec { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); display: flex; align-items: center; gap: 8px; }
-.sec .live { margin-left: auto; text-transform: none; letter-spacing: 0; font-family: var(--mono); color: var(--agent); }
-
-.timeline { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
-.step { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 12px; position: relative; padding-bottom: 14px; }
-.step::before { content: ""; position: absolute; left: 10px; top: 22px; bottom: 0; width: 2px; background: var(--line); }
-.step:last-child::before { display: none; }
-.node { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--panel); border: 2px solid var(--line); z-index: 0; }
-.node svg { width: 11px; height: 11px; }
-.step.done .node { border-color: var(--ok); color: var(--ok); }
-.step.think .node { border-color: var(--accent); color: var(--accent); }
-.step.wait .node { border-color: var(--agent); color: var(--agent); background: var(--agent-soft); }
-.step.stop .node { border-color: var(--bad); color: var(--bad); }
-.s-title { font-weight: 600; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
-.s-title .ms { font-family: var(--mono); font-size: 11px; color: var(--muted); font-weight: 400; }
-.s-note { color: var(--muted); font-size: 13px; margin-top: 2px; }
-.call { margin-top: 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); font-family: var(--mono); font-size: 12px; overflow: hidden; }
-.call .sig { padding: 8px 10px; border-bottom: 1px solid var(--line); color: var(--accent); overflow-x: auto; white-space: nowrap; }
-.call dl { margin: 0; padding: 8px 10px; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 3px 14px; }
-.call dt { color: var(--muted); }
-.call dd { margin: 0; overflow-wrap: anywhere; }
-.step.enter { animation: rise .35s ease both; }
-@keyframes rise { from { opacity: .0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-@media (prefers-reduced-motion: reduce) { .step.enter { animation: none; } }
-
-.action { border: 1px solid var(--agent); background: var(--agent-soft); border-radius: 12px; padding: 14px 16px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 16px; align-items: center; }
-.action.done { border-color: var(--ok); background: var(--ok-soft); }
-.action.esc { border-color: var(--bad); background: var(--bad-soft); }
-.action .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--agent); font-weight: 600; }
-.action.done .lbl { color: var(--ok); }
-.action.esc .lbl { color: var(--bad); }
-.action .what { font-weight: 600; font-size: 15px; }
-.action .amt { font-family: var(--mono); font-size: 22px; font-weight: 500; grid-row: span 2; font-variant-numeric: tabular-nums; }
-.action .why { grid-column: 1 / -1; color: var(--muted); font-size: 12.5px; }
-textarea { width: 100%; min-height: 168px; resize: vertical; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); line-height: 1.55; }
-.btns { display: flex; gap: 10px; flex-wrap: wrap; }
-.btn { border: 1px solid var(--line); background: var(--panel); padding: 10px 16px; border-radius: 10px; font-weight: 600; }
-.btn:hover { background: var(--sunk); }
-.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-.btn.primary:hover { filter: brightness(1.08); }
-.btn[disabled] { opacity: .5; cursor: default; }
-.conf { margin-left: auto; align-self: center; font-size: 12px; color: var(--muted); font-family: var(--mono); }
-
-.toast { position: fixed; right: max(20px, env(safe-area-inset-right, 0px)); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); background: var(--fg); color: var(--bg); padding: 12px 16px; border-radius: 10px; font-weight: 500; box-shadow: var(--shadow); z-index: 20; }
-
-@media (max-width: 1200px) {
-  .panes { grid-template-columns: 320px minmax(0, 1fr); }
-  .queues { grid-column: 1 / -1; flex-direction: row; flex-wrap: wrap; padding: 0; }
-  .queues .qlabel, .tools { display: none; }
-  .q { width: auto; }
-  .detail { grid-template-columns: minmax(0, 1fr); }
-  .col + .col { border-left: 0; border-top: 1px solid var(--line); }
-}
-@media (max-width: 760px) {
-  .app { height: auto; }
-  .panes { grid-template-columns: minmax(0, 1fr); }
-  .list { max-height: 360px; }
-  .stats { margin-left: 0; gap: 16px; }
-  .ws { display: none; }
-}
-
-body { margin: 0; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.5; }
 [hidden] { display: none !important; }
-.q .dot.pulse { animation: pulse 1.2s ease-in-out infinite; }
-@keyframes pulse { 50% { opacity: .3; } }
-@media (prefers-reduced-motion: reduce) { .q .dot.pulse { animation: none; } }
-.chip.run { background: var(--accent-soft); color: var(--accent); }
-.list-head .btn { padding: 6px 10px; font-size: 12.5px; }
+button, textarea, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--leaf); outline-offset: 2px; }
+
+.app { min-height: 100%; display: flex; flex-direction: column; padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: max(20px, env(safe-area-inset-right, 0px)); padding-block: 18px 24px; gap: 22px; max-width: 1280px; margin: 0 auto; }
+
+.top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 9px; font-weight: 700; font-size: 17px; }
+.brand i { width: 22px; height: 22px; border-radius: 50%; background: var(--leaf); display: inline-block; position: relative; }
+.brand i::after { content: ""; position: absolute; inset: 6px 9px; border-radius: 4px; background: var(--panel); transform: rotate(28deg); }
+.shop { color: var(--muted); font-size: 14px; }
+.top .agent { margin-left: auto; font-size: 13px; color: var(--muted); }
+.top .agent b { font-weight: 600; color: var(--ink); }
+
+.hello h1 { font-family: var(--display); font-weight: 400; font-size: clamp(28px, 4vw, 38px); line-height: 1.15; margin: 0 0 6px; letter-spacing: -.01em; text-wrap: balance; }
+.hello p { margin: 0; color: var(--muted); font-size: 16px; max-width: 62ch; }
+
+.main { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 28px; align-items: start; flex: 1; }
+
+/* inbox list */
+.side { display: flex; flex-direction: column; gap: 12px; position: sticky; top: 12px; }
+.tabs { display: flex; gap: 4px; background: var(--sunk); padding: 4px; border-radius: 12px; }
+.tab { flex: 1; border: 0; background: transparent; padding: 7px 6px; border-radius: 9px; font-size: 13.5px; color: var(--muted); font-weight: 500; white-space: nowrap; }
+.tab[aria-selected="true"] { background: var(--panel); color: var(--ink); box-shadow: 0 1px 2px rgba(30, 20, 10, .08); }
+.tab span { font-variant-numeric: tabular-nums; opacity: .7; margin-left: 3px; }
+.rows { display: flex; flex-direction: column; gap: 2px; }
+.row { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; gap: 2px 12px; align-items: center; padding: 11px 12px; border: 0; border-radius: 12px; background: transparent; text-align: left; width: 100%; }
+.row:hover { background: var(--sunk); }
+.row[aria-current="true"] { background: var(--panel); box-shadow: 0 1px 3px rgba(30, 20, 10, .07); }
+.face { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 600; grid-row: span 2; background: hsl(var(--h) 45% 88%); color: hsl(var(--h) 40% 28%); flex: none; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .face:not(.relay-face) { background: hsl(var(--h) 25% 24%); color: hsl(var(--h) 45% 82%); } }
+:root[data-theme="dark"] .face:not(.relay-face) { background: hsl(var(--h) 25% 24%); color: hsl(var(--h) 45% 82%); }
+.row .name { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .time { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.row .line { grid-column: 2 / 4; display: flex; gap: 8px; align-items: center; min-width: 0; }
+.row .subj { color: var(--muted); font-size: 14px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.pill { font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 999px; white-space: nowrap; }
+.pill.p-ask { background: var(--honey-soft); color: var(--honey); }
+.pill.p-team { background: var(--cherry-soft); color: var(--cherry); }
+.pill.p-done { background: var(--leaf-soft); color: var(--leaf); }
+.pill.p-busy { background: var(--sunk); color: var(--muted); }
+.new { border: 1px dashed var(--line); background: transparent; border-radius: 12px; padding: 10px; color: var(--muted); font-size: 14px; }
+.new:hover { color: var(--ink); border-color: var(--muted); }
+.calm { padding: 28px 12px; color: var(--muted); text-align: center; }
+.calm b { display: block; font-family: var(--display); font-weight: 400; font-size: 20px; color: var(--ink); margin-bottom: 4px; }
+
+/* conversation */
+.convo { background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: clamp(20px, 3vw, 36px); display: flex; flex-direction: column; gap: 26px; min-width: 0; }
+.convo h2 { font-family: var(--display); font-weight: 400; font-size: 26px; line-height: 1.2; margin: 0 0 6px; text-wrap: balance; }
+.meta { color: var(--muted); font-size: 13.5px; display: flex; gap: 6px 14px; flex-wrap: wrap; }
+.said { display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 14px; }
+.said .who { font-weight: 600; font-size: 14px; margin-bottom: 6px; }
+.said .who small { color: var(--muted); font-weight: 400; margin-left: 6px; }
+.bubble { background: var(--sunk); border-radius: 4px 16px 16px 16px; padding: 14px 18px; max-width: 64ch; }
+.bubble p { margin: 0 0 10px; }
+.bubble p:last-child { margin: 0; }
+.face.relay-face { background: var(--leaf); color: var(--leaf-ink); }
+
+.steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.step { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 10px; }
+.step .dot { width: 8px; height: 8px; border-radius: 50%; margin: 8px 5px 0; background: var(--leaf); }
+.step.wait .dot { background: var(--honey); }
+.step.stop .dot { background: var(--cherry); }
+.step.think .dot { background: var(--muted); }
+.step .t { font-weight: 500; }
+.step .n { color: var(--muted); font-size: 14px; }
+.step details { margin-top: 4px; }
+.step summary { font-size: 12.5px; color: var(--muted); cursor: pointer; width: fit-content; }
+.step pre { margin: 6px 0 0; padding: 10px 12px; background: var(--sunk); border-radius: 10px; font-family: var(--mono); font-size: 12px; line-height: 1.55; overflow-x: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.step.enter { animation: rise .35s ease both; }
+@keyframes rise { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.working { color: var(--muted); font-size: 14px; display: flex; gap: 8px; align-items: center; }
+.working i { width: 8px; height: 8px; border-radius: 50%; background: var(--leaf); animation: breathe 1.2s ease-in-out infinite; }
+@keyframes breathe { 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .step.enter, .working i { animation: none; } }
+
+.ask { border: 1px solid var(--line); border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+.ask .kicker { font-size: 13px; color: var(--muted); }
+.ask .big { font-family: var(--display); font-size: 22px; line-height: 1.25; }
+.ask .big b { font-weight: 400; color: var(--honey); }
+.ask .why { font-size: 13.5px; color: var(--muted); margin-top: -8px; }
+.ask.team .big b { color: var(--cherry); }
+.ask.done .big b { color: var(--leaf); }
+.letter-label { font-size: 13px; color: var(--muted); }
+textarea { width: 100%; min-height: 190px; resize: vertical; padding: 16px 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); line-height: 1.6; }
+.letter { white-space: pre-wrap; padding: 16px 18px; border-radius: 12px; background: var(--sunk); line-height: 1.6; max-width: 64ch; }
+.btns { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.btn { border: 1px solid var(--line); background: var(--panel); padding: 11px 18px; border-radius: 999px; font-weight: 600; }
+.btn:hover { background: var(--sunk); }
+.btn.go { background: var(--leaf); border-color: var(--leaf); color: var(--leaf-ink); }
+.btn.go:hover { filter: brightness(1.07); background: var(--leaf); }
+.btn[disabled] { opacity: .55; cursor: default; }
+.sure { margin-left: auto; font-size: 13px; color: var(--muted); }
+
 .form { display: grid; gap: 12px; }
-.form label { display: grid; gap: 6px; font-size: 12px; color: var(--muted); font-weight: 500; }
-.form input { font: inherit; color: inherit; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
-.form textarea { min-height: 130px; }
-.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-@media (max-width: 520px) { .row2 { grid-template-columns: 1fr; } }
-.presets { display: flex; gap: 8px; flex-wrap: wrap; }
-.presets button { font-size: 12px; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); }
-.presets button:hover { background: var(--sunk); }
-.empty { padding: 24px 16px; color: var(--muted); }
-.err { color: var(--bad); font-size: 13px; }
-.agent-chip { font-family: var(--mono); font-size: 12px; padding: 6px 10px; border-radius: 999px; background: var(--sunk); color: var(--muted); }
+.form label { display: grid; gap: 6px; font-size: 13px; color: var(--muted); }
+.form input { padding: 10px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+.form textarea { min-height: 120px; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.chips button { font-size: 13px; padding: 5px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); }
+.chips button:hover { background: var(--sunk); }
+.err { color: var(--cherry); }
+
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(22px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 11px 18px; border-radius: 999px; font-weight: 500; z-index: 20; }
+
+@media (max-width: 900px) {
+  .main { grid-template-columns: minmax(0, 1fr); }
+  .side { position: static; }
+  .rows { max-height: 320px; overflow: auto; }
+}
+@media (max-width: 520px) {
+  .two { grid-template-columns: 1fr; }
+  .shop { display: none; }
+  .sure { margin-left: 0; width: 100%; }
+}
 </style>
+
 </head>
 <body>
 <div class="app">
   <header class="top">
-    <div class="brand"><span class="mark"><svg viewBox="0 0 16 16" fill="none"><path d="M2 8h7M6 4l4 4-4 4M12 3v10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Relay</div>
-    <div class="ws">Northwind Coffee Co. · Support</div>
-    <div class="stats">
-      <div class="stat"><b id="st-auto">–</b><span>Resolved by agent</span></div>
-      <div class="stat"><b id="st-wait">–</b><span>Awaiting you</span></div>
-      <div class="stat"><b id="st-reply">–</b><span>Median first reply</span></div>
-    </div>
-    <span class="agent-chip" id="st-agent">agent: …</span>
-    <span class="guard"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1l4 1.6v3c0 2.5-1.7 4.3-4 5.4C3.7 9.9 2 8.1 2 5.6v-3L6 1z" stroke="currentColor" stroke-width="1.4"/></svg>Money moves and order changes need human approval</span>
+    <div class="brand"><i aria-hidden="true"></i>Relay</div>
+    <span class="shop">Northwind Coffee Co.</span>
+    <span class="agent" id="agent"></span>
   </header>
 
-  <div class="panes">
-    <nav class="pane queues" id="queues" aria-label="Queues"></nav>
-    <section class="pane list" id="list" aria-label="Tickets"></section>
-    <section class="pane detail" id="detail" aria-live="polite"></section>
+  <section class="hello">
+    <h1 id="hello">Good morning.</h1>
+    <p id="summary">Catching up on the inbox…</p>
+  </section>
+
+  <div class="main">
+    <aside class="side">
+      <div class="tabs" role="tablist" id="tabs"></div>
+      <div class="rows" id="rows"></div>
+      <button class="new" id="compose">Write a test email</button>
+    </aside>
+    <article class="convo" id="convo" aria-live="polite"></article>
   </div>
 </div>
 <div class="toast" id="toast" hidden></div>
 
 <script>
-const ICON = {
-  check: '<svg viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2l2.3 2.3 4.7-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  spark: '<svg viewBox="0 0 12 12" fill="none"><path d="M6 1v3M6 8v3M1 6h3M8 6h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
-  hand: '<svg viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="2.4" fill="currentColor"/></svg>',
-  stop: '<svg viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'
-};
-const QUEUES = [
-  { id: "wait", name: "Needs approval", color: "var(--agent)", match: s => s === "AWAITING_APPROVAL" },
-  { id: "run", name: "Agent working", color: "var(--accent)", match: s => s === "RUNNING" || s === "NEW" },
-  { id: "esc", name: "Escalated", color: "var(--bad)", match: s => s === "ESCALATED" },
-  { id: "ok", name: "Resolved", color: "var(--ok)", match: s => s === "RESOLVED" },
-  { id: "all", name: "All tickets", color: "var(--muted)", match: () => true }
+const TABS = [
+  { id: "ask", name: "Waiting", match: s => s === "AWAITING_APPROVAL" },
+  { id: "team", name: "Team", match: s => s === "ESCALATED" },
+  { id: "done", name: "Done", match: s => s === "RESOLVED" },
+  { id: "all", name: "All", match: () => true }
 ];
 const PRESETS = [
-  { label: "Damaged parcel", customerName: "Laura Gómez", customerEmail: "laura.gomez@example.com", subject: "Order 48213 arrived broken",
+  { label: "Broken parcel", customerName: "Laura Gómez", customerEmail: "laura.gomez@example.com", subject: "Order 48213 arrived broken",
     body: "Hola, the box for order 48213 was crushed and the dripper inside is broken. I'd like my money back please." },
   { label: "Where is it?", customerName: "Jonas Weber", customerEmail: "jonas.weber@example.com", subject: "Tracking for 48302",
     body: "Any update on order 48302? It has said in transit since Monday." },
@@ -234,16 +203,18 @@ const PRESETS = [
     body: "Your descaler ruined my grinder and my machine. Repair is €640. My lawyer will contact you if this isn't paid." }
 ];
 
-const state = { tickets: [], queue: "wait", current: null, detail: null, seen: new Set(), composing: false };
+const state = { tickets: [], tab: "ask", current: null, seen: new Set(), composing: false };
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const DEMO = typeof window.relayDemoApi === "function";
 
 function csrf() {
   const m = document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]+)/);
   return m ? decodeURIComponent(m[1]) : "";
 }
 async function api(path, opts = {}) {
+  if (DEMO) return window.relayDemoApi(path, opts);
   const headers = { "Content-Type": "application/json" };
   if (opts.method && opts.method !== "GET") headers["X-XSRF-TOKEN"] = csrf();
   const res = await fetch(path, { headers, credentials: "same-origin", ...opts });
@@ -255,133 +226,138 @@ async function api(path, opts = {}) {
   return res.status === 202 || res.status === 204 ? null : res.json();
 }
 
-function initials(name) { return name.split(/\s+/).map(p => p[0]).slice(0, 2).join("").toUpperCase(); }
-function hue(name) { let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) % 360; return `hsl(${h} 55% 42%)`; }
-function hhmm(iso) { return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); }
-function statusChip(s) {
-  return { AWAITING_APPROVAL: ["Awaiting approval", "wait"], ESCALATED: ["Escalated", "esc"], RESOLVED: ["Resolved", "ok"],
-           RUNNING: ["Agent working", "run"], NEW: ["Queued", "run"] }[s];
+const first = n => n.split(/\s+/)[0];
+const initials = n => n.split(/\s+/).map(p => p[0]).slice(0, 2).join("").toUpperCase();
+function face(name) {
+  let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) % 360;
+  return `--h:${h}`;
 }
-function tags(t) {
-  const out = [];
-  if (t.intent) out.push([t.intent.replace(/_/g, " "), ""]);
-  if (t.sentiment) out.push([t.sentiment, /frustrated|angry/.test(t.sentiment) ? "hi" : ""]);
-  if (t.priority) out.push([t.priority, /high|urgent/.test(t.priority) ? "hi" : ""]);
-  return out;
+const hhmm = iso => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+const paras = s => esc(s).split(/\n\n+/).map(p => `<p>${p.replace(/\n/g, "<br>")}</p>`).join("");
+
+function pill(t) {
+  const a = (t.actions || []).find(x => x.status === "PENDING");
+  if (t.status === "AWAITING_APPROVAL") return `<span class="pill p-ask">${esc(a ? short(a) : "Reply")}</span>`;
+  if (t.status === "ESCALATED") return `<span class="pill p-team">Team</span>`;
+  if (t.status === "RESOLVED") return `<span class="pill p-done">Sent</span>`;
+  return `<span class="pill p-busy">Working</span>`;
+}
+function short(a) {
+  return { REFUND: a.amount + " refund", ADDRESS_CHANGE: "New address", SEND_INVOICE: "Invoice" }[a.type] || a.summary;
+}
+
+function greet(stats) {
+  const h = new Date().getHours();
+  $("hello").textContent = h < 12 ? "Good morning." : h < 19 ? "Good afternoon." : "Good evening.";
+  const waiting = stats.awaitingApproval, solo = state.tickets.filter(t => t.resolvedByAgent).length, team = stats.escalated;
+  const parts = [];
+  parts.push(waiting === 0 ? "Nobody is waiting on you." : waiting === 1 ? "One customer is waiting on your yes." : `${waiting} customers are waiting on your yes.`);
+  const did = [];
+  if (solo) did.push(`answered ${solo} on my own`);
+  if (team) did.push(`passed ${team} to the team`);
+  if (did.length) parts.push("I " + did.join(" and ") + ".");
+  $("summary").textContent = parts.join(" ");
+  $("agent").innerHTML = `Agent <b>${esc(stats.agent.replace("claude:", ""))}</b>`;
 }
 
 async function refresh() {
   const [tickets, stats] = await Promise.all([api("/api/tickets"), api("/api/stats")]);
   state.tickets = tickets;
-  $("st-auto").textContent = stats.resolved ? stats.autoResolvedPercent + "%" : "–";
-  $("st-wait").textContent = stats.awaitingApproval;
-  $("st-reply").textContent = stats.medianFirstReplySeconds == null ? "–" : fmtSecs(stats.medianFirstReplySeconds);
-  $("st-agent").textContent = "agent: " + stats.agent.replace("claude:", "");
-  renderQueues(); renderList();
-}
-function fmtSecs(s) { return s < 90 ? s + " s" : Math.round(s / 60) + " min"; }
-
-function renderQueues() {
-  $("queues").innerHTML = '<div class="qlabel">Queues</div>' + QUEUES.map(q => {
-    const n = state.tickets.filter(t => q.match(t.status)).length;
-    return `<button class="q" data-q="${q.id}" aria-pressed="${q.id === state.queue}"><span class="dot${q.id === "run" && n ? " pulse" : ""}" style="background:${q.color}"></span>${q.name}<span class="n">${n}</span></button>`;
-  }).join("") + `<div class="tools"><div class="qlabel" style="padding:0 0 4px">Connected tools</div>
-    ${["shopify · orders", "stripe · charges", "dhl · tracking", "vies · VAT"].map(n => `<div class="tool-row"><i></i><code>${n}</code></div>`).join("")}</div>`;
+  greet(stats);
+  renderTabs(); renderRows();
 }
 
-function visible() { const q = QUEUES.find(x => x.id === state.queue); return state.tickets.filter(t => q.match(t.status)); }
+function visible() { const t = TABS.find(x => x.id === state.tab); return state.tickets.filter(x => t.match(x.status)); }
 
-function renderList() {
+function renderTabs() {
+  $("tabs").innerHTML = TABS.map(t => {
+    const n = state.tickets.filter(x => t.match(x.status)).length;
+    return `<button class="tab" role="tab" data-tab="${t.id}" aria-selected="${t.id === state.tab}">${t.name}<span>${n}</span></button>`;
+  }).join("");
+}
+
+function renderRows() {
   const items = visible();
-  const q = QUEUES.find(x => x.id === state.queue);
-  $("list").innerHTML = `<div class="list-head"><h2>${q.name}</h2><button class="btn" id="compose">Simulate email</button></div>` +
-    (items.length ? items.map(t => {
-      const [sl, sc] = statusChip(t.status);
-      return `<button class="tk" data-id="${t.id}" aria-current="${t.id === state.current && !state.composing}">
-        <span class="av" style="background:${hue(t.customerName)}">${esc(initials(t.customerName))}</span>
-        <span class="who">${esc(t.customerName)}</span><span class="when">${hhmm(t.receivedAt)}</span>
-        <span class="subj">${esc(t.subject)}</span>
-        <span class="tags"><span class="chip ${sc}">${sl}</span>${tags(t).map(([l, c]) => `<span class="chip ${c}">${esc(l)}</span>`).join("")}</span>
-      </button>`;
-    }).join("") : `<p class="empty">Nothing here. New tickets show up as soon as the agent picks them up.</p>`);
+  $("rows").innerHTML = items.length ? items.map(t => `
+    <button class="row" data-id="${t.id}" aria-current="${t.id === state.current && !state.composing}">
+      <span class="face" style="${face(t.customerName)}">${esc(initials(t.customerName))}</span>
+      <span class="name">${esc(t.customerName)}</span><span class="time">${hhmm(t.receivedAt)}</span>
+      <span class="line"><span class="subj">${esc(t.subject)}</span>${pill(t)}</span>
+    </button>`).join("")
+    : state.tab === "ask"
+      ? `<div class="calm"><b>All caught up.</b>Go get a coffee. I'll keep an eye on the inbox.</div>`
+      : `<div class="calm">Nothing here yet.</div>`;
 }
 
 async function select(id) {
   state.current = id; state.composing = false; state.seen = new Set();
-  renderList();
-  await loadDetail(false);
+  renderRows();
+  await loadConvo(false);
 }
-
-async function loadDetail(animateNew) {
+async function loadConvo(animate) {
   if (!state.current || state.composing) return;
-  const t = await api("/api/tickets/" + state.current);
-  state.detail = t;
-  renderDetail(t, animateNew);
+  renderConvo(await api("/api/tickets/" + state.current), animate);
 }
 
-function shortJson(v) {
-  if (v == null) return "";
-  if (typeof v !== "object") return String(v);
-  const s = JSON.stringify(v);
-  return s.length > 140 ? s.slice(0, 137) + "…" : s;
+function details(s) {
+  if (!s.tool || s.tool === "submit_reply") return "";
+  const out = s.output && typeof s.output === "object"
+    ? Object.fromEntries(Object.entries(s.output).filter(([k]) => k !== "note" && k !== "action_id")) : s.output;
+  return `<details><summary>Details</summary><pre>${esc(s.tool)}(${esc(JSON.stringify(s.input))})\n→ ${esc(JSON.stringify(out, null, 1))}</pre></details>`;
 }
-
 function stepHtml(s, animate) {
-  const kind = { THINK: "think", TOOL: "done", WAIT: "wait", STOP: "stop", DONE: "done" }[s.kind];
-  const icon = { think: ICON.spark, done: ICON.check, wait: ICON.hand, stop: ICON.stop }[kind];
-  const showCall = s.tool && s.tool !== "submit_reply";
-  const args = s.input ? Object.entries(s.input).map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join(", ") : "";
-  const rows = s.output && typeof s.output === "object" ? Object.entries(s.output).filter(([k]) => k !== "note" && k !== "action_id") : [];
-  return `<li class="step ${kind}${animate ? " enter" : ""}"><span class="node">${icon}</span><div>
-    <div class="s-title">${esc(s.title)}${s.durationMs ? `<span class="ms">${s.durationMs} ms</span>` : ""}</div>
-    ${s.note ? `<div class="s-note">${esc(s.note)}</div>` : ""}
-    ${showCall ? `<div class="call"><div class="sig">${esc(s.tool)}({ ${esc(args)} })</div>${rows.length ? `<dl>${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(shortJson(v))}</dd>`).join("")}</dl>` : ""}</div>` : ""}
-  </div></li>`;
+  const k = { THINK: "think", TOOL: "", WAIT: "wait", STOP: "stop", DONE: "" }[s.kind];
+  return `<li class="step ${k}${animate ? " enter" : ""}"><span class="dot"></span><div>
+    <div class="t">${esc(s.title)}</div>${s.note ? `<div class="n">${esc(s.note)}</div>` : ""}${details(s)}</div></li>`;
 }
 
-function actionCard(t) {
+function decision(t) {
   const pending = t.actions.filter(a => a.status === "PENDING");
   const approved = t.actions.filter(a => a.status === "APPROVED");
   if (t.status === "AWAITING_APPROVAL") {
-    return `<div class="sec">Proposed action${pending.length > 1 ? "s" : ""}</div>` + (pending.length ? pending.map(a =>
-      `<div class="action"><span class="lbl">Needs your approval</span><span class="amt">${esc(a.amount)}</span><span class="what">${esc(a.summary)}</span><span class="why">${esc(a.detail)}</span></div>`).join("")
-      : `<div class="action"><span class="lbl">Needs your approval</span><span class="amt">Reply</span><span class="what">Send the drafted reply</span><span class="why">No account changes</span></div>`) +
-      `<div class="sec">Draft reply</div>
-      <textarea id="reply-edit" aria-label="Draft reply">${esc(t.reply)}</textarea>
-      <div class="btns"><button class="btn primary" id="approve">Approve and send</button><button class="btn" id="handover">Send to a person</button>${t.confidence != null ? `<span class="conf">confidence ${t.confidence.toFixed(2)}</span>` : ""}</div>`;
+    const name = esc(first(t.customerName));
+    const phrase = a => ({
+      REFUND: `refund <b>${esc(a.amount)}</b> to ${name}'s card`,
+      ADDRESS_CHANGE: `send ${name}'s parcel to <b>the new address</b>`,
+      SEND_INVOICE: `send ${name} <b>a corrected invoice</b>`
+    }[a.type] || esc(a.summary));
+    const what = pending.length ? pending.map(phrase).join(" and ") : `send ${name} <b>this reply</b>`;
+    return `<div class="ask">
+      <div class="kicker">I'd like your OK to</div>
+      <div class="big">${what}.</div>
+      ${pending.length ? `<div class="why">${pending.map(a => esc(a.detail)).join(" · ")}</div>` : ""}
+      <label class="letter-label" for="reply-edit">The reply I wrote for ${esc(first(t.customerName))}</label>
+      <textarea id="reply-edit">${esc(t.reply)}</textarea>
+      <div class="btns"><button class="btn go" id="approve">Approve and send</button><button class="btn" id="handover">I'll handle it</button>
+      ${t.confidence != null ? `<span class="sure">I'm ${Math.round(t.confidence * 100)}% sure about this one</span>` : ""}</div>
+    </div>`;
   }
   if (t.status === "ESCALATED") {
-    return `<div class="action esc"><span class="lbl">Escalated</span><span class="amt">Person</span><span class="what">Handed to a person</span><span class="why">${esc(t.escalationReason)}</span></div>`;
+    return `<div class="ask team"><div class="kicker">I didn't reply</div><div class="big"><b>Passed to the team.</b></div><div class="why">${esc(t.escalationReason)}</div></div>`;
   }
   if (t.status === "RESOLVED") {
-    const what = approved.length ? approved.map(a => a.summary).join(", ") : (t.resolvedByAgent ? "Replied automatically" : "Reply sent");
-    const why = approved.length ? approved.map(a => a.result).join(" · ") : "Read-only answer";
-    return `<div class="action done"><span class="lbl">Done</span><span class="amt">${t.resolvedByAgent ? "Auto" : "You"}</span><span class="what">${esc(what)}</span><span class="why">${esc(why)}</span></div>
-      <div class="sec">Sent reply</div><div class="msg">${esc(t.reply).split(/\n\n+/).map(p => `<p>${p.replace(/\n/g, "<br>")}</p>`).join("")}</div>`;
+    const how = approved.length ? approved.map(a => a.result).join(" · ") : t.resolvedByAgent ? "Answered on my own, nothing in the account changed." : "Sent after your OK.";
+    return `<div class="ask done"><div class="kicker">${esc(how)}</div><div class="big"><b>Sent to ${esc(first(t.customerName))}.</b></div><div class="letter">${esc(t.reply)}</div></div>`;
   }
-  return `<div class="action"><span class="lbl">Working</span><span class="amt">…</span><span class="what">The agent is on it</span><span class="why">Steps appear on the right as they happen</span></div>`;
+  return "";
 }
 
-function renderDetail(t, animateNew) {
-  const keepDraft = $("reply-edit") && t.status === "AWAITING_APPROVAL" ? $("reply-edit").value : null;
-  const total = t.steps.reduce((a, s) => a + s.durationMs, 0);
-  const running = t.status === "RUNNING" || t.status === "NEW";
-  $("detail").innerHTML = `
-    <div class="col">
-      <div class="d-head"><h1>${esc(t.subject)}</h1>
-        <div class="d-meta"><span>${esc(t.customerName)}</span><span>${esc(t.customerEmail)}</span><span>${esc(t.channel)}</span><span>${t.id}</span><span>${hhmm(t.receivedAt)}</span></div></div>
-      <div class="msg">${esc(t.body).split(/\n\n+/).map(p => `<p>${p.replace(/\n/g, "<br>")}</p>`).join("")}</div>
-      ${actionCard(t)}
-    </div>
-    <div class="col">
-      <div class="sec">Agent run<span class="live">${running ? "running…" : `${t.steps.length} steps · ${(total / 1000).toFixed(1)} s`}</span></div>
-      <ol class="timeline">${t.steps.map(s => { const fresh = animateNew && !reduce && !state.seen.has(s.id); state.seen.add(s.id); return stepHtml(s, fresh); }).join("")}</ol>
-    </div>`;
-  if (keepDraft != null) $("reply-edit").value = keepDraft;
-  const ap = $("approve");
-  if (ap) ap.onclick = () => act(ap, "/approve", { reply: $("reply-edit").value }, `Sent to ${t.customerName.split(" ")[0]}`);
-  const ho = $("handover");
-  if (ho) ho.onclick = () => act(ho, "/hand-over", {}, `${t.id} sent to a person`);
+function renderConvo(t, animate) {
+  const draft = $("reply-edit") && t.status === "AWAITING_APPROVAL" ? $("reply-edit").value : null;
+  const busy = t.status === "RUNNING" || t.status === "NEW";
+  const secs = (t.steps.reduce((a, s) => a + s.durationMs, 0) / 1000).toFixed(1);
+  $("convo").innerHTML = `
+    <div><h2>${esc(t.subject)}</h2><div class="meta"><span>${esc(t.customerEmail)}</span><span>${esc(t.channel)}</span><span>${hhmm(t.receivedAt)}</span></div></div>
+    <div class="said"><span class="face" style="${face(t.customerName)}">${esc(initials(t.customerName))}</span>
+      <div><div class="who">${esc(t.customerName)}</div><div class="bubble">${paras(t.body)}</div></div></div>
+    ${decision(t)}
+    <div class="said"><span class="face relay-face">R</span>
+      <div><div class="who">${busy ? "Relay<small>working on it</small>" : `How I got here<small>${t.steps.length} steps · ${secs} s</small>`}</div>
+      <ol class="steps">${t.steps.map(s => { const fresh = animate && !reduce && !state.seen.has(s.id); state.seen.add(s.id); return stepHtml(s, fresh); }).join("")}</ol>
+      ${busy ? `<div class="working"><i></i>Looking into it…</div>` : ""}</div></div>`;
+  if (draft != null) $("reply-edit").value = draft;
+  if ($("approve")) $("approve").onclick = e => act(e.target, "/approve", { reply: $("reply-edit").value }, `Sent to ${first(t.customerName)}`);
+  if ($("handover")) $("handover").onclick = e => act(e.target, "/hand-over", {}, `It's yours. I won't touch ${first(t.customerName)}'s account.`);
 }
 
 async function act(btn, path, body, done) {
@@ -391,30 +367,21 @@ async function act(btn, path, body, done) {
     toast(done);
     await refresh();
     const next = visible().find(x => x.id !== state.current);
-    if (next) await select(next.id); else await loadDetail(false);
-  } catch (e) { toast("Couldn't do that: " + e.message); btn.disabled = false; }
+    if (next) await select(next.id); else await loadConvo(false);
+  } catch (e) { toast("That didn't work: " + e.message); btn.disabled = false; }
 }
 
-function renderCompose(preset = PRESETS[0]) {
-  state.composing = true; renderList();
-  $("detail").innerHTML = `<div class="col">
-    <div class="d-head"><h1>Simulate an inbound email</h1><div class="d-meta"><span>The agent picks it up the moment you send it.</span></div></div>
-    <div class="presets">${PRESETS.map((p, i) => `<button type="button" data-preset="${i}">${p.label}</button>`).join("")}</div>
+function renderCompose(p = PRESETS[0]) {
+  state.composing = true; renderRows();
+  $("convo").innerHTML = `<div><h2>Send a test email</h2><div class="meta">I'll pick it up the moment it lands.</div></div>
+    <div class="chips">${PRESETS.map((x, i) => `<button type="button" data-preset="${i}">${x.label}</button>`).join("")}</div>
     <form class="form" id="compose-form">
-      <div class="row2"><label>Customer name<input id="f-name" required value="${esc(preset.customerName)}"></label>
-      <label>Email<input id="f-email" type="email" required value="${esc(preset.customerEmail)}"></label></div>
-      <label>Subject<input id="f-subject" required value="${esc(preset.subject)}"></label>
-      <label>Message<textarea id="f-body" required>${esc(preset.body)}</textarea></label>
-      <div class="btns"><button class="btn primary" type="submit">Send to the inbox</button></div>
-      <p class="s-note">Customer emails in the demo store: laura.gomez, tom.becker, priya.nair, jonas.weber and sophie.laurent @example.com, marco@cafferossi.it.</p>
-    </form></div>
-    <div class="col"><div class="sec">How it works</div>
-      <ol class="timeline">${[
-        ["think", "The agent reads the email", "Intent, mood and urgency come from the model, not keyword rules."],
-        ["done", "It looks things up", "Orders, charges, tracking and VAT checks through the shop's tools."],
-        ["wait", "Risky steps wait for you", "Refunds, address changes and invoices are queued, never run by the agent."],
-        ["done", "You approve or take over", "Edit the reply, approve, and only then does money move."]
-      ].map(([k, t, n]) => `<li class="step ${k}"><span class="node">${k === "think" ? ICON.spark : k === "wait" ? ICON.hand : ICON.check}</span><div><div class="s-title">${t}</div><div class="s-note">${n}</div></div></li>`).join("")}</ol></div>`;
+      <div class="two"><label>Name<input id="f-name" required value="${esc(p.customerName)}"></label>
+      <label>Email<input id="f-email" type="email" required value="${esc(p.customerEmail)}"></label></div>
+      <label>Subject<input id="f-subject" required value="${esc(p.subject)}"></label>
+      <label>Message<textarea id="f-body" required>${esc(p.body)}</textarea></label>
+      <div class="btns"><button class="btn go" type="submit">Send it</button></div>
+    </form>`;
   document.querySelectorAll("[data-preset]").forEach(b => b.onclick = () => renderCompose(PRESETS[+b.dataset.preset]));
   $("compose-form").onsubmit = async e => {
     e.preventDefault();
@@ -423,41 +390,41 @@ function renderCompose(preset = PRESETS[0]) {
       const t = await api("/api/tickets", { method: "POST", body: JSON.stringify({
         customerName: $("f-name").value, customerEmail: $("f-email").value, channel: "Email",
         subject: $("f-subject").value, body: $("f-body").value }) });
-      state.queue = "all"; await refresh(); await select(t.id); state.seen = new Set();
-    } catch (err) { toast("Couldn't send: " + err.message); btn.disabled = false; }
+      state.tab = "all"; await refresh(); await select(t.id);
+    } catch (err) { toast("Couldn't send it: " + err.message); btn.disabled = false; }
   };
 }
 
 let toastTimer;
-function toast(msg) { const el = $("toast"); el.textContent = msg; el.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => el.hidden = true, 2600); }
+function toast(msg) { const el = $("toast"); el.textContent = msg; el.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => el.hidden = true, 2800); }
 
-$("queues").addEventListener("click", async e => {
-  const b = e.target.closest(".q"); if (!b) return;
-  state.queue = b.dataset.q; renderQueues(); renderList();
-  const first = visible()[0]; if (first) await select(first.id);
+$("tabs").addEventListener("click", async e => {
+  const b = e.target.closest(".tab"); if (!b) return;
+  state.tab = b.dataset.tab; renderTabs(); renderRows();
+  const f = visible()[0]; if (f) await select(f.id);
 });
-$("list").addEventListener("click", e => {
-  if (e.target.closest("#compose")) { renderCompose(); return; }
-  const b = e.target.closest(".tk"); if (b) select(b.dataset.id);
-});
+$("rows").addEventListener("click", e => { const b = e.target.closest(".row"); if (b) select(b.dataset.id); });
+$("compose").onclick = () => renderCompose();
+if (DEMO) $("compose").hidden = true;
 
-let pending = null;
-function soon(fn) { clearTimeout(pending); pending = setTimeout(fn, 120); }
+let pending;
+const soon = fn => { clearTimeout(pending); pending = setTimeout(fn, 120); };
 function connect() {
+  if (DEMO) return;
   const es = new EventSource("/api/events");
-  es.addEventListener("step", ev => { const d = JSON.parse(ev.data); if (d.ticketId === state.current) soon(() => loadDetail(true)); });
-  es.addEventListener("ticket", ev => { const d = JSON.parse(ev.data); refresh(); if (d.ticketId === state.current) soon(() => loadDetail(true)); });
+  es.addEventListener("step", ev => { if (JSON.parse(ev.data).ticketId === state.current) soon(() => loadConvo(true)); });
+  es.addEventListener("ticket", ev => { refresh(); if (JSON.parse(ev.data).ticketId === state.current) soon(() => loadConvo(true)); });
   es.onerror = () => { es.close(); setTimeout(connect, 3000); };
 }
 
 (async function start() {
   try {
     await refresh();
-    if (!visible().length) state.queue = "all", renderQueues(), renderList();
-    const first = visible()[0];
-    if (first) await select(first.id); else renderCompose();
+    if (!visible().length) { state.tab = "all"; renderTabs(); renderRows(); }
+    const f = visible()[0];
+    if (f) await select(f.id); else if (!DEMO) renderCompose();
   } catch (e) {
-    $("detail").innerHTML = `<div class="col"><p class="err">Can't reach the Relay API (${esc(e.message)}). Is the backend running?</p></div>`;
+    $("convo").innerHTML = `<p class="err">I can't reach the Relay server (${esc(e.message)}). Is the backend running?</p>`;
   }
   connect();
 })();
